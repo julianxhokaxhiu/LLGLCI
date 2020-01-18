@@ -65,7 +65,7 @@ for:
 install:
   - if not exist VulkanSDK-%VULKAN_VERSION%.exe curl -L --silent --show-error --output VulkanSDK-%VULKAN_VERSION%.exe https://vulkan.lunarg.com/sdk/download/%VULKAN_VERSION%/windows/VulkanSDK-%VULKAN_VERSION%-Installer.exe?Human=true
   - VulkanSDK-%VULKAN_VERSION%.exe /S
-  - git clone --recursive https://github.com/julianxhokaxhiu/LLGL.git
+  - git clone --recursive https://github.com/LukasBanana/LLGL.git
   - cd LLGL
   - git clone https://github.com/LukasBanana/GaussianLib.git
   - ps: |
