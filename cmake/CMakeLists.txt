@@ -1,6 +1,6 @@
 include(ExternalProject)
 
-set(LLGL_VERSION "0.0.3")
+set(LLGL_VERSION "0.0.3.0")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(LLGL_RELEASE "Release")
