@@ -1,0 +1,129 @@
+# .appveyor.yml
+
+# Build version
+version: '0.0.3.{build}'
+
+# Use the latest available toolchain
+image: Visual Studio 2019
+
+# fetch repository as zip archive
+shallow_clone: true
+
+# PRs do not increment the build number
+pull_requests:
+  do_not_increment_build_number: true
+
+# Build configurations
+configuration:
+  - Debug
+  - Release
+
+# Default environment variables
+environment:
+  _IS_BUILD_CANARY: false
+  _RELEASE_NAME: LLGL
+  # Use Python 3.x
+  PYTHON: "C:\\Python38-x64"
+  PYTHON_VERSION: "3.8.x"
+  PYTHON_ARCH: "64"
+  # Vulkan
+  VULKAN: "C:\\VulkanSDK"
+  VULKAN_VERSION: 1.1.130.0
+
+cache:
+  - VulkanSDK-${VULKAN_VERSION}.exe
+
+for:
+  -
+    matrix:
+      only:
+        - configuration: Debug
+    environment:
+      _MSVC_RUNTIME: MultiThreadedDebug
+    after_build:
+      - cmd: |
+          md .install\lib\LLGL
+          mv include .install
+          mv .dist/build/%CONFIGURATION%/*.lib .install/lib/LLGL
+          mv .dist/LLGL.dir/%CONFIGURATION%/*.pdb .install/lib/LLGL
+          mv .dist/LLGL_Direct3D11.dir/%CONFIGURATION%/*.pdb .install/lib/LLGL
+          mv .dist/LLGL_Direct3D12.dir/%CONFIGURATION%/*.pdb .install/lib/LLGL
+          mv .dist/LLGL_OpenGL.dir/%CONFIGURATION%/*.pdb .install/lib/LLGL
+          mv .dist/LLGL_Vulkan.dir/%CONFIGURATION%/*.pdb .install/lib/LLGL
+  -
+    matrix:
+      only:
+        - configuration: Release
+    environment:
+      _MSVC_RUNTIME: MultiThreaded
+    after_build:
+      - cmd: |
+          md .install\lib\LLGL
+          mv include .install
+          mv .dist/build/%CONFIGURATION%/*.lib .install/lib/LLGL
+
+install:
+  - if not exist VulkanSDK-%VULKAN_VERSION%.exe curl -L --silent --show-error --output VulkanSDK-%VULKAN_VERSION%.exe https://vulkan.lunarg.com/sdk/download/%VULKAN_VERSION%/windows/VulkanSDK-%VULKAN_VERSION%-Installer.exe?Human=true
+  - VulkanSDK-%VULKAN_VERSION%.exe /S
+  - git clone --recursive https://github.com/julianxhokaxhiu/LLGL.git
+  - cd LLGL
+  - git clone https://github.com/LukasBanana/GaussianLib.git
+  - ps: |
+      $file = 'CMakeLists.txt'
+      $replaceWhat = 'project(LLGL)'
+      $replaceWith = "cmake_policy(SET CMP0091 NEW)`nproject(LLGL)"
+      (Get-Content $file).Replace($replaceWhat,$replaceWith) | Set-Content $file
+
+# Prepare Cpp environment
+before_build:
+  - cmd: |
+      set PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%
+      set VULKAN_SDK=%VULKAN%\\%VULKAN_VERSION%
+  - ps: |
+      if ($env:APPVEYOR_REPO_TAG -eq "true" -and $env:APPVEYOR_REPO_TAG_NAME) {
+        $env:APPVEYOR_BUILD_VERSION = $env:APPVEYOR_BUILD_VERSION.Substring(0,$env:APPVEYOR_BUILD_VERSION.LastIndexOf('.')) + ".0"
+        $env:_RELEASE_NAME = $env:_RELEASE_NAME + "-v" + $env:APPVEYOR_BUILD_VERSION
+      } else {
+        $env:_RELEASE_NAME = $env:_RELEASE_NAME + "-Canary"
+        $env:APPVEYOR_REPO_TAG_NAME = "canary"
+        $env:_IS_BUILD_CANARY = "true"
+      }
+
+build_script:
+  - cmd: |
+      cmake -G "Visual Studio 16 2019" -A Win32 -DLLGL_BUILD_STATIC_LIB=ON -DLLGL_BUILD_RENDERER_OPENGL=ON -DLLGL_BUILD_RENDERER_DIRECT3D11=ON -DLLGL_BUILD_RENDERER_DIRECT3D12=ON -DLLGL_BUILD_RENDERER_VULKAN=ON -DLLGL_BUILD_EXAMPLES=OFF -DLLGL_BUILD_TESTS=OFF -DGaussLib_INCLUDE_DIR:STRING="GaussianLib/include" -S . -B .dist
+      cmake --build .dist --config %CONFIGURATION%
+
+# Do not run unit tests
+test: off
+
+# Package artifacts
+artifacts:
+  - path: LLGL\.install
+    name: ${_RELEASE_NAME}_${CONFIGURATION}
+    type: zip
+
+# Create a GitHub release for every tag
+deploy:
+  # Deploy only when new tags are pushed
+  - provider: GitHub
+    tag: ${appveyor_repo_tag_name}
+    release: ${_RELEASE_NAME}
+    artifact: ${_RELEASE_NAME}_${CONFIGURATION}
+    auth_token:
+      secure: SXUyBqg8+wl9fn3xHV2Br0xDH65EyPAnFwJbwcg94wIesv9osQEefC3zxu9iDTUh
+    on:
+      _IS_BUILD_CANARY: false
+  # Deploy on each commit
+  - provider: GitHub
+    tag: ${appveyor_repo_tag_name}
+    release: ${_RELEASE_NAME} v${appveyor_build_version}
+    artifact: ${_RELEASE_NAME}_${CONFIGURATION}
+    prerelease: true
+    force_update: true
+    auth_token:
+      secure: SXUyBqg8+wl9fn3xHV2Br0xDH65EyPAnFwJbwcg94wIesv9osQEefC3zxu9iDTUh
+    on:
+      _IS_BUILD_CANARY: true
+    description: |
+      This is a canary build. Please be aware it may be prone to crashing and is NOT tested by anyone. Use this build AT YOUR OWN RISK!
