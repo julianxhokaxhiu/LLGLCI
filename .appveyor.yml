@@ -44,6 +44,7 @@ for:
       - cmd: |
           md .install\lib\LLGL
           mv include .install
+          mv GaussianLib/include/* .install/include
           mv .dist/build/%CONFIGURATION%/*.lib .install/lib/LLGL
           mv .dist/LLGL.dir/%CONFIGURATION%/*.pdb .install/lib/LLGL
           mv .dist/LLGL_Direct3D11.dir/%CONFIGURATION%/*.pdb .install/lib/LLGL
@@ -60,6 +61,7 @@ for:
       - cmd: |
           md .install\lib\LLGL
           mv include .install
+          mv GaussianLib/include/* .install/include
           mv .dist/build/%CONFIGURATION%/*.lib .install/lib/LLGL
 
 install:
